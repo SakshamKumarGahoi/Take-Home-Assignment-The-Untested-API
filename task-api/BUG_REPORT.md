@@ -24,3 +24,56 @@ changing offset calculation from page * limit to
 
 const offset = (page - 1) * limit; 
 
+## Bug 2: Completing a task unexpectedly changes its priority
+
+### Location
+
+`src/services/taskService.js`
+
+### Expected behavior
+
+The `PATCH /tasks/:id/complete` endpoint should mark the task
+as completed by:
+
+- changing `status` to `done`
+- setting `completedAt`
+
+The task's existing priority should remain unchanged.
+
+### Actual behavior
+
+Completing a task always changes its priority to `medium`.
+
+For example:
+
+```text
+Before:
+priority = high
+status = todo
+
+After:
+priority = medium
+status = done
+
+
+---
+
+# Now make the fix
+
+Change `completeTask()` to:
+
+```js
+const completeTask = (id) => {
+  const task = findById(id);
+  if (!task) return null;
+
+  const updated = {
+    ...task,
+    status: 'done',
+    completedAt: new Date().toISOString(),
+  };
+
+  const index = tasks.findIndex((t) => t.id === id);
+  tasks[index] = updated;
+  return updated;
+};

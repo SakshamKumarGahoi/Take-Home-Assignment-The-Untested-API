@@ -244,6 +244,17 @@ describe('taskService', () => {
       ).not.toBe('Invalid Date');
     });
 
+    test('preserves the task priority when completing', () => {
+      const task = taskService.create({
+        title: 'Important task',
+        priority: 'high',
+      });
+
+      const completed = taskService.completeTask(task.id);
+
+      expect(completed.priority).toBe('high');
+    });
+
     test('returns null when task does not exist', () => {
       expect(
         taskService.completeTask('missing-id')
