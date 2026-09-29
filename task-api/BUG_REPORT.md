@@ -1,68 +1,124 @@
-# Bug Report
+Bug Report
+Bug 1: Pagination Uses an Incorrect Offset
+Location
 
-## Bug 1: Pagination uses an incorrect offset
+src/services/taskService.js
 
-### Location:Task Service File in services 
+Endpoint
 
-`src/services/taskService.js`
+GET /tasks?page=1&limit=2
 
-### Expected Behaviour 
+Expected Behaviour
 
-For a request such as GET /tasks?page=1&limit=2
+For a request such as:
 
-the api should return first two tasks but whats happening is
+GET /tasks?page=1&limit=2
 
-The current implementation calculates the pagination offset as:
+the API should return the first two tasks.
 
-```js
+For page 2 with the same limit, it should return the next two tasks.
+
+Actual Behaviour
+
+The original implementation calculated the pagination offset as:
+
 const offset = page * limit;
 
-This causes page 1 to start at index 2 instead of index 0.
+Because the API uses 1-based page numbers while JavaScript arrays use 0-based indexes, page 1 incorrectly started at index 2 instead of index 0.
 
-Proposed Fix:
-changing offset calculation from page * limit to 
+For example, with four tasks and limit=2:
 
-const offset = (page - 1) * limit; 
+Page 1 incorrectly returned tasks 3 and 4.
+Page 2 incorrectly returned an empty array.
+How It Was Discovered
 
-## Bug 2: Completing a task unexpectedly changes its priority
+A unit test was written for getPaginated() to verify that page 1 returns the first two tasks and page 2 returns the next two tasks.
 
-### Location
+The tests failed against the original implementation.
 
-`src/services/taskService.js`
+Root Cause
 
-### Expected behavior
+The offset calculation did not account for the fact that page numbers start at 1.
 
-The `PATCH /tasks/:id/complete` endpoint should mark the task
-as completed by:
+Fix
 
-- changing `status` to `done`
-- setting `completedAt`
+Changed:
 
-The task's existing priority should remain unchanged.
+const offset = page * limit;
 
-### Actual behavior
+to:
 
-Completing a task always changes its priority to `medium`.
+const offset = (page - 1) * limit;
+Regression Test
+
+Added unit tests covering:
+
+First page
+Second page
+
+Both tests now pass.
+
+Bug 2: Completing a Task Unexpectedly Changes Its Priority
+Location
+
+src/services/taskService.js
+
+Endpoint
+
+PATCH /tasks/:id/complete
+
+Expected Behaviour
+
+Completing a task should:
+
+Change status to done
+Set completedAt
+Preserve the task's existing priority and other properties
+Actual Behaviour
+
+The original implementation explicitly changed the task's priority to medium whenever a task was completed.
 
 For example:
 
-```text
 Before:
+
 priority = high
 status = todo
 
 After:
+
 priority = medium
 status = done
 
+This caused an unrelated task property to be modified.
 
----
+How It Was Discovered
 
-# Now make the fix
+A unit test was added that created a task with:
 
-Change `completeTask()` to:
+{
+  title: 'Important task',
+  priority: 'high'
+}
 
-```js
+The task was then completed and the test verified that its priority remained high.
+
+The test failed because the original implementation returned medium.
+
+Root Cause
+
+The completeTask() function explicitly contained:
+
+priority: 'medium',
+
+which overwrote the task's existing priority.
+
+Fix
+
+Removed the explicit priority modification.
+
+The updated implementation is:
+
 const completeTask = (id) => {
   const task = findById(id);
   if (!task) return null;
@@ -77,3 +133,17 @@ const completeTask = (id) => {
   tasks[index] = updated;
   return updated;
 };
+Regression Test
+
+Added a unit test verifying that a task with priority: 'high' remains high after completion.
+
+The regression test now passes.
+
+Summary
+
+Two bugs were identified through automated testing:
+
+Pagination offset calculation caused the first page to skip tasks.
+Task completion incorrectly changed the existing priority to medium.
+
+Both bugs were fixed and regression tests were added to ensure the issues do not reappear.
