@@ -290,4 +290,143 @@ describe('Task API', () => {
       });
     });
   });
+
+
+  describe('PATCH /tasks/:id/assign', () => {
+  test('assigns a task to a person', async () => {
+    const createResponse = await request(app)
+      .post('/tasks')
+      .send({
+        title: 'Task to assign',
+      });
+
+    const id = createResponse.body.id;
+
+    const response = await request(app)
+      .patch(`/tasks/${id}/assign`)
+      .send({
+        assignee: 'John',
+      });
+
+    expect(response.status).toBe(200);
+    expect(response.body.id).toBe(id);
+    expect(response.body.assignee).toBe('John');
+  });
+
+  test('trims whitespace from the assignee name', async () => {
+    const createResponse = await request(app)
+      .post('/tasks')
+      .send({
+        title: 'Task',
+      });
+
+    const response = await request(app)
+      .patch(`/tasks/${createResponse.body.id}/assign`)
+      .send({
+        assignee: '  John  ',
+      });
+
+    expect(response.status).toBe(200);
+    expect(response.body.assignee).toBe('John');
+  });
+
+  test('rejects an empty assignee', async () => {
+    const createResponse = await request(app)
+      .post('/tasks')
+      .send({
+        title: 'Task',
+      });
+
+    const response = await request(app)
+      .patch(`/tasks/${createResponse.body.id}/assign`)
+      .send({
+        assignee: '',
+      });
+
+    expect(response.status).toBe(400);
+    expect(response.body.error).toBeDefined();
+  });
+
+  test('rejects a whitespace-only assignee', async () => {
+    const createResponse = await request(app)
+      .post('/tasks')
+      .send({
+        title: 'Task',
+      });
+
+    const response = await request(app)
+      .patch(`/tasks/${createResponse.body.id}/assign`)
+      .send({
+        assignee: '   ',
+      });
+
+    expect(response.status).toBe(400);
+  });
+
+  test('rejects a missing assignee', async () => {
+    const createResponse = await request(app)
+      .post('/tasks')
+      .send({
+        title: 'Task',
+      });
+
+    const response = await request(app)
+      .patch(`/tasks/${createResponse.body.id}/assign`)
+      .send({});
+
+    expect(response.status).toBe(400);
+  });
+
+  test('rejects a non-string assignee', async () => {
+    const createResponse = await request(app)
+      .post('/tasks')
+      .send({
+        title: 'Task',
+      });
+
+    const response = await request(app)
+      .patch(`/tasks/${createResponse.body.id}/assign`)
+      .send({
+        assignee: 123,
+      });
+
+    expect(response.status).toBe(400);
+  });
+
+  test('returns 404 when task does not exist', async () => {
+    const response = await request(app)
+      .patch('/tasks/missing-id/assign')
+      .send({
+        assignee: 'John',
+      });
+
+    expect(response.status).toBe(404);
+    expect(response.body.error).toBe('Task not found');
+  });
+
+  test('allows reassignment of an existing assignee', async () => {
+    const createResponse = await request(app)
+      .post('/tasks')
+      .send({
+        title: 'Task',
+      });
+
+    const id = createResponse.body.id;
+
+    await request(app)
+      .patch(`/tasks/${id}/assign`)
+      .send({
+        assignee: 'John',
+      });
+
+    const response = await request(app)
+      .patch(`/tasks/${id}/assign`)
+      .send({
+        assignee: 'Sarah',
+      });
+
+    expect(response.status).toBe(200);
+    expect(response.body.assignee).toBe('Sarah');
+  });
+});
 });
